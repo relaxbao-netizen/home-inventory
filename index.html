@@ -765,10 +765,12 @@ function openProductModal(id){
         <div class="field"><label>分類</label><input id="f_cat" value="${esc(p?p.category:'')}" placeholder="例：清潔用品" list="catList">
           <datalist id="catList">${cats.map(c=>`<option value="${c}">`).join('')}</datalist></div>
       </div>
-      <div class="field"><label>條碼</label><input id="f_barcode" value="${esc(p?p.barcode:'')}" placeholder="可留空"></div>
-      <div class="field"><label>商品照片</label><input type="file" id="f_photo" accept="image/*" onchange="previewPhoto(event)">
-        <div class="hint">選填，會縮小後存在本機。</div>
-        <div id="photoPrev" style="margin-top:8px">${p&&p.photo?`<img src="${p.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">`:''}</div></div>
+      <div class="field"><label>條碼</label>
+        <div style="display:flex;gap:8px">
+          <input id="f_barcode" value="${esc(p?p.barcode:'')}" placeholder="可留空，或按右邊掃描" style="flex:1">
+          <button type="button" class="btn" onclick="openScanner('f_barcode')" style="white-space:nowrap">📷 掃描</button>
+        </div>
+        <div class="hint">用手機相機掃商品條碼自動帶入。</div></div>
       <div class="field"><label>備註</label><textarea id="f_note" placeholder="例：只買無香款">${esc(p?p.note:'')}</textarea></div>
     </div>
     <div class="mf"><button class="btn" onclick="${p?`openDetail('${id}')`:'closeModal()'}">取消</button>
@@ -776,28 +778,68 @@ function openProductModal(id){
   $('#overlay').classList.add('open');
   $('#f_name').focus();
 }
-let _photoData='';
-function previewPhoto(ev){
-  const file=ev.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const img=new Image();img.onload=()=>{
-      const max=320,scale=Math.min(1,max/Math.max(img.width,img.height));
-      const cv=document.createElement('canvas');cv.width=img.width*scale;cv.height=img.height*scale;
-      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-      _photoData=cv.toDataURL('image/jpeg',0.8);
-      $('#photoPrev').innerHTML=`<img src="${_photoData}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">`;
-    };img.src=e.target.result;
-  };reader.readAsDataURL(file);
-}
 function saveProduct(id){
   const name=$('#f_name').value.trim();
   if(!name){toast('請輸入商品名稱');$('#f_name').focus();return;}
   const data={name,brand:$('#f_brand').value,category:$('#f_cat').value,
     barcode:$('#f_barcode').value,note:$('#f_note').value};
-  if(_photoData)data.photo=_photoData;
-  if(id){updateProduct(id,data);_photoData='';toast('已儲存');refresh();openDetail(id);}
-  else{const o=addProduct(data);_photoData='';toast('商品已新增');refresh();openBatchModal(o.id);}
+  if(id){updateProduct(id,data);toast('已儲存');refresh();openDetail(id);}
+  else{const o=addProduct(data);toast('商品已新增');refresh();openBatchModal(o.id);}
+}
+
+/* ============================================================ 條碼掃描 (相機) ============================================================ */
+async function openScanner(targetId){
+  if(!('BarcodeDetector' in window)){
+    alert('這個瀏覽器不支援條碼掃描。\n建議用手機的 Chrome（Android）開啟本網站，或手動輸入條碼。');
+    return;
+  }
+  const scan=document.createElement('div');
+  scan.id='scanOverlay';
+  scan.style.cssText='position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden';
+  scan.innerHTML=`
+    <div style="position:absolute;top:0;left:0;right:0;padding:14px 16px;color:#fff;display:flex;align-items:center;gap:10px;background:linear-gradient(rgba(0,0,0,.65),transparent);z-index:2">
+      <b style="font-size:16px">掃描條碼</b>
+      <button class="scanClose" style="margin-left:auto;background:rgba(255,255,255,.22);color:#fff;border:0;border-radius:9px;padding:9px 16px;font-size:15px;font-weight:600">✕ 關閉</button>
+    </div>
+    <video playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+    <div style="position:absolute;width:76%;max-width:320px;height:150px;border:2px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)"></div>
+    <div style="position:absolute;bottom:44px;color:#fff;font-size:14px;background:rgba(0,0,0,.55);padding:8px 16px;border-radius:20px;z-index:2">將條碼對準框內</div>`;
+  document.body.appendChild(scan);
+  const video=scan.querySelector('video');
+  let stream=null,raf=0,stopped=false;
+  const cleanup=()=>{stopped=true;if(raf)cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());scan.remove();};
+  scan.querySelector('.scanClose').onclick=cleanup;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    video.srcObject=stream;await video.play();
+  }catch(e){alert('無法開啟相機：'+(e.message||e.name)+'\n請確認已允許相機權限。');cleanup();return;}
+  let detector;
+  try{const fmts=await BarcodeDetector.getSupportedFormats();detector=new BarcodeDetector({formats:fmts});}
+  catch(e){detector=new BarcodeDetector();}
+  const tick=async()=>{
+    if(stopped)return;
+    try{const codes=await detector.detect(video);
+      if(codes&&codes.length){
+        const val=codes[0].rawValue;
+        const input=document.getElementById(targetId);
+        if(input)input.value=val;
+        cleanup();
+        toast('已掃到條碼：'+val);
+        onScanned(targetId,val);
+        return;
+      }
+    }catch(e){}
+    raf=requestAnimationFrame(tick);
+  };
+  raf=requestAnimationFrame(tick);
+}
+/* 掃到條碼後：若已有相同條碼的商品，提示可直接開啟 */
+function onScanned(targetId,val){
+  if(targetId!=='f_barcode')return;
+  const exist=DB.products.find(p=>p.barcode&&p.barcode===val);
+  if(exist&&confirm(`已有商品「${exist.name}」使用這個條碼，要直接開啟它嗎？`)){
+    closeModal();openDetail(exist.id);
+  }
 }
 
 /* ============================================================ 新增購買批次 ============================================================ */
@@ -937,10 +979,17 @@ function loadDemo(){
 }
 
 /* ============================================================ 共用 ============================================================ */
-function closeModal(){$('#overlay').classList.remove('open');$('#modalHost').innerHTML='';_photoData='';}
+function closeModal(){$('#overlay').classList.remove('open');$('#modalHost').innerHTML='';}
 function refresh(){renderNav();render();}
 $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+/* 手機版：側欄開啟時，點側欄以外的區域（主內容）即收回 */
+document.addEventListener('click',e=>{
+  const side=$('#side');
+  if(side.classList.contains('open')&&!side.contains(e.target)&&!e.target.closest('.menuBtn')){
+    side.classList.remove('open');
+  }
+});
 
 /* init */
 load();renderNav();render();
