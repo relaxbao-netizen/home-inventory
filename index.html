@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家庭庫存與價格管理</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#1d2433; --muted:#6b7280; --line:#e5e7eb;
+  --brand:#2563eb; --brand-ink:#1d4ed8; --ok:#16a34a; --warn:#d97706; --danger:#dc2626;
+  --chip:#eef2ff; --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+  --radius:14px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1420;--panel:#171d2b;--ink:#e6e9ef;--muted:#9aa4b2;--line:#273043;
+  --chip:#1e2740;--shadow:0 1px 3px rgba(0,0,0,.4);}
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brand)}
+button{font:inherit;cursor:pointer}
+.app{display:flex;min-height:100vh}
+/* Sidebar */
+.side{width:220px;flex:0 0 220px;background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;padding:6px 10px 16px}
+.brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:grid;place-items:center;color:#fff;font-size:16px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--muted);padding:10px 12px;border-radius:10px;font-weight:600}
+.nav button .ic{width:20px;text-align:center}
+.nav button:hover{background:var(--chip);color:var(--ink)}
+.nav button.active{background:var(--brand);color:#fff}
+.nav .badge{margin-left:auto;background:var(--danger);color:#fff;border-radius:20px;font-size:11px;padding:1px 7px;min-width:18px;text-align:center}
+.nav button.active .badge{background:rgba(255,255,255,.25)}
+.side .foot{margin-top:16px;padding:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.side .foot button{display:block;width:100%;margin-top:8px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px}
+/* Main */
+.main{flex:1;min-width:0;padding:22px 26px 60px}
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.topbar h1{font-size:22px;margin:0;flex:0 0 auto}
+.search{flex:1;max-width:420px;position:relative}
+.search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+.search .si{position:absolute;left:10px;top:9px;color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600}
+.btn:hover{border-color:var(--brand)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-ink)}
+.btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+.btn.danger{color:var(--danger);border-color:transparent}
+.btn.danger:hover{border-color:var(--danger)}
+.spacer{flex:1}
+/* Cards / grid */
+.grid{display:grid;gap:14px}
+.cards{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .k{font-size:13px;color:var(--muted);font-weight:600}
+.stat .v{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.stat .sub{font-size:12px;color:var(--muted)}
+.stat.click{cursor:pointer}
+.stat.click:hover{border-color:var(--brand)}
+.sect{margin-top:22px}
+.sect h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+/* list rows */
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:12.5px;color:var(--muted)}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:26px;font-size:14px}
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.g{background:rgba(22,163,74,.12);color:var(--ok)}
+.pill.y{background:rgba(217,119,6,.14);color:var(--warn)}
+.pill.r{background:rgba(220,38,38,.12);color:var(--danger)}
+.pill.b{background:var(--chip);color:var(--brand)}
+.pill.gray{background:var(--chip);color:var(--muted)}
+.tag{font-size:12px;background:var(--chip);color:var(--muted);border-radius:6px;padding:1px 7px}
+/* product grid */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);cursor:pointer;transition:.12s}
+.pcard:hover{border-color:var(--brand);transform:translateY(-1px)}
+.pcard .ph{display:flex;gap:10px;align-items:flex-start}
+.pcard .thumb{width:44px;height:44px;border-radius:10px;background:var(--chip);display:grid;place-items:center;font-size:20px;flex:0 0 44px;overflow:hidden}
+.pcard .thumb img{width:100%;height:100%;object-fit:cover}
+.pcard h3{margin:0;font-size:15px}
+.pcard .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.pcard .st{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+/* filter bar */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filters select,.filters input{padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)}
+.chipbtn{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:6px 12px;border-radius:20px;font-weight:600;font-size:13px}
+.chipbtn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+/* table */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px}
+th{color:var(--muted);font-size:12.5px;font-weight:700}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(15,20,32,.5);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+.overlay.open{display:flex}
+.modal{background:var(--panel);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:640px;border:1px solid var(--line)}
+.modal.wide{max-width:840px}
+.modal .mh{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal .mh h2{margin:0;font-size:18px}
+.modal .mh .x{margin-left:auto;background:none;border:0;font-size:22px;color:var(--muted);line-height:1}
+.modal .mb{padding:20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.field textarea{min-height:64px;resize:vertical}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:560px){.frow,.frow3{grid-template-columns:1fr}}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.priceflag{margin-top:6px;font-size:13px;font-weight:600}
+/* detail */
+.dhead{display:flex;gap:14px;align-items:flex-start}
+.dhead .thumb{width:64px;height:64px;border-radius:14px;background:var(--chip);display:grid;place-items:center;font-size:30px;overflow:hidden;flex:0 0 64px}
+.dhead .thumb img{width:100%;height:100%;object-fit:cover}
+.sub-h{font-size:13px;font-weight:700;color:var(--muted);margin:20px 0 8px;text-transform:uppercase;letter-spacing:.4px}
+.batch{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.batch .bt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.batch .bmeta{font-size:12.5px;color:var(--muted);margin-top:4px}
+.itemdots{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.dot{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--bg)}
+.dot.used{background:var(--chip);color:var(--muted);text-decoration:line-through;opacity:.7}
+.dot.next{border-color:var(--warn);box-shadow:0 0 0 2px rgba(217,119,6,.2)}
+.chartwrap{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+.pstats{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px}
+.pstats b{font-size:16px;display:block}
+/* toast */
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:12px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;transition:.22s;z-index:100;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hide{display:none!important}
+/* mobile nav */
+.menuBtn{display:none}
+@media(max-width:760px){
+  .side{position:fixed;z-index:60;left:-240px;transition:.2s;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  .side.open{left:0}
+  .menuBtn{display:inline-flex}
+  .main{padding:16px 14px 60px}
+  .topbar h1{font-size:19px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><span class="logo">🏠</span> 家庭庫存</div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="btn sm menuBtn" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <h1 id="pageTitle">首頁</h1>
+      <div class="search"><span class="si">🔍</span><input id="globalSearch" placeholder="搜尋商品、品牌、商店、分類…" oninput="onSearch()"></div>
+      <div class="spacer"></div>
+      <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay"><div id="modalHost"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   資料層 (Store) — 目前存 localStorage。
+   之後要接 Supabase 只需替換這一層的讀寫實作即可。
+   ============================================================ */
+const KEY='hh_inventory_v1';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const todayISO=()=>new Date().toISOString().slice(0,10);
+
+const DB={
+  products:[], batches:[], items:[], settings:{expiryAlerts:[90,30,7],lowStock:1}
+};
+function load(){
+  try{const r=JSON.parse(localStorage.getItem(KEY));if(r){Object.assign(DB,r);
+    DB.products=r.products||[];DB.batches=r.batches||[];DB.items=r.items||[];
+    DB.settings=Object.assign({expiryAlerts:[90,30,7],lowStock:1},r.settings||{});}}catch(e){}
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(DB));}
+
+/* --- 商品 --- */
+function addProduct(p){const o={id:uid(),name:p.name.trim(),brand:(p.brand||'').trim(),
+  category:(p.category||'').trim(),barcode:(p.barcode||'').trim(),note:(p.note||'').trim(),
+  photo:p.photo||'',createdAt:Date.now()};DB.products.push(o);save();return o;}
+function updateProduct(id,p){const o=DB.products.find(x=>x.id===id);if(!o)return;
+  Object.assign(o,{name:p.name.trim(),brand:(p.brand||'').trim(),category:(p.category||'').trim(),
+  barcode:(p.barcode||'').trim(),note:(p.note||'').trim(),photo:p.photo??o.photo});save();}
+function deleteProduct(id){DB.items=DB.items.filter(i=>i.productId!==id);
+  DB.batches=DB.batches.filter(b=>b.productId!==id);
+  DB.products=DB.products.filter(p=>p.id!==id);save();}
+
+/* --- 購買批次 (同時自動建立單件庫存) --- */
+function addBatch(b){
+  const qty=Math.max(1,parseInt(b.quantity)||1);
+  const batch={id:uid(),productId:b.productId,purchaseDate:b.purchaseDate||todayISO(),
+    store:(b.store||'').trim(),unitPrice:parseFloat(b.unitPrice)||0,quantity:qty,
+    expiryDate:b.expiryDate||'',note:(b.note||'').trim(),createdAt:Date.now()};
+  DB.batches.push(batch);
+  for(let i=1;i<=qty;i++){DB.items.push({id:uid(),batchId:batch.id,productId:b.productId,
+    serial:i,status:'unused',opened:false,usedDate:null,createdAt:Date.now()});}
+  save();return batch;
+}
+function deleteBatch(id){DB.items=DB.items.filter(i=>i.batchId!==id);
+  DB.batches=DB.batches.filter(b=>b.id!==id);save();}
+
+/* --- 使用 (FEFO：先扣最早到期未使用的一件) --- */
+function useOne(productId){
+  const cands=DB.items.filter(i=>i.productId===productId&&i.status==='unused');
+  if(!cands.length)return null;
+  cands.sort((a,b)=>expRank(a)-expRank(b));
+  const it=cands[0];it.status='used';it.usedDate=todayISO();save();return it;
+}
+function undoUse(itemId){const it=DB.items.find(i=>i.id===itemId);if(!it)return;
+  it.status='unused';it.usedDate=null;it.opened=false;save();}
+function toggleOpened(itemId){const it=DB.items.find(i=>i.id===itemId);if(!it)return;
+  it.opened=!it.opened;save();}
+function useItem(itemId){const it=DB.items.find(i=>i.id===itemId);if(!it||it.status==='used')return;
+  it.status='used';it.usedDate=todayISO();save();}
+/* 到期排序權重：無到期日排最後 */
+function expRank(item){const b=batchOf(item);
+  if(!b||!b.expiryDate)return 8.64e15;return new Date(b.expiryDate).getTime();}
+
+/* --- 查詢輔助 --- */
+const batchOf=i=>DB.batches.find(b=>b.id===i.batchId);
+const productOf=id=>DB.products.find(p=>p.id===id);
+const itemsOfProduct=id=>DB.items.filter(i=>i.productId===id);
+const batchesOfProduct=id=>DB.batches.filter(b=>b.productId===id).sort((a,b)=>(a.expiryDate||'9').localeCompare(b.expiryDate||'9'));
+const unusedCount=id=>DB.items.filter(i=>i.productId===id&&i.status==='unused').length;
+const stockOf=id=>unusedCount(id);
+function daysLeft(exp){if(!exp)return null;
+  const d=Math.ceil((new Date(exp)-new Date(todayISO()))/86400000);return d;}
+function expiryTone(days){if(days===null)return null;if(days<0)return'r';if(days<=7)return'r';if(days<=30)return'y';return'g';}
+
+/* 折線圖用：某商品的價格歷史（依批次購買日） */
+function priceHistory(id){return batchesOfProduct(id)
+  .filter(b=>b.unitPrice>0)
+  .slice().sort((a,b)=>a.purchaseDate.localeCompare(b.purchaseDate))
+  .map(b=>({date:b.purchaseDate,price:b.unitPrice,store:b.store}));}
+
+/* ============================================================ 工具 ============================================================ */
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const money=n=>'$'+(Math.round(n*100)/100).toLocaleString('en-US');
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
+function fmtDate(d){return d||'—';}
+function emoji(cat){const m={'生活用品':'🧻','清潔用品':'🧴','美妝':'💄','保健食品':'💊','食品':'🍜','嬰幼兒':'🍼','寵物':'🐾'};return m[cat]||'📦';}
+
+/* ============================================================ 導覽 ============================================================ */
+let CURRENT='dash';
+let SEARCH='';
+const PAGES=[
+  {id:'dash',ic:'🏠',label:'首頁'},
+  {id:'products',ic:'📦',label:'商品管理'},
+  {id:'expiry',ic:'⏰',label:'到期管理'},
+  {id:'price',ic:'📈',label:'價格分析'},
+  {id:'usage',ic:'📝',label:'使用紀錄'},
+  {id:'shopping',ic:'🛒',label:'購物清單'},
+  {id:'stats',ic:'📊',label:'統計分析'},
+];
+function renderNav(){
+  const nav=$('#nav');nav.innerHTML='';
+  const alerts=expiringSoon(30).length+expiredList().length;
+  const shop=shoppingList().length;
+  PAGES.forEach(p=>{
+    const b=el('button',p.id===CURRENT?'active':'');
+    let badge='';
+    if(p.id==='expiry'&&alerts)badge=`<span class="badge">${alerts}</span>`;
+    if(p.id==='shopping'&&shop)badge=`<span class="badge">${shop}</span>`;
+    b.innerHTML=`<span class="ic">${p.ic}</span><span>${p.label}</span>${badge}`;
+    b.onclick=()=>{go(p.id)};nav.appendChild(b);
+  });
+}
+function go(id){CURRENT=id;$('#pageTitle').textContent=PAGES.find(p=>p.id===id).label;
+  $('#side').classList.remove('open');renderNav();render();}
+
+/* ============================================================ 衍生資料 ============================================================ */
+function expiringSoon(within){
+  return DB.batches.map(b=>({b,d:daysLeft(b.expiryDate),left:DB.items.filter(i=>i.batchId===b.id&&i.status==='unused').length}))
+    .filter(x=>x.d!==null&&x.d>=0&&x.d<=within&&x.left>0)
+    .sort((a,b)=>a.d-b.d);
+}
+function expiredList(){
+  return DB.batches.map(b=>({b,d:daysLeft(b.expiryDate),left:DB.items.filter(i=>i.batchId===b.id&&i.status==='unused').length}))
+    .filter(x=>x.d!==null&&x.d<0&&x.left>0).sort((a,b)=>a.d-b.d);
+}
+function lowStockProducts(){return DB.products.filter(p=>stockOf(p.id)>0&&stockOf(p.id)<=DB.settings.lowStock);}
+function outOfStockProducts(){return DB.products.filter(p=>stockOf(p.id)===0);}
+function shoppingList(){/* 剩<=門檻 或 完全沒貨 的商品 */
+  return DB.products.filter(p=>stockOf(p.id)<=DB.settings.lowStock);}
+function usedItemsSorted(){return DB.items.filter(i=>i.status==='used')
+  .sort((a,b)=>(b.usedDate||'').localeCompare(a.usedDate||'')||b.createdAt-a.createdAt);}
+function nextToUse(){/* 每個有庫存商品的建議先用件 */
+  return DB.products.map(p=>{
+    const cands=DB.items.filter(i=>i.productId===p.id&&i.status==='unused');
+    if(!cands.length)return null;cands.sort((a,b)=>expRank(a)-expRank(b));
+    const it=cands[0];const b=batchOf(it);const d=daysLeft(b&&b.expiryDate);
+    return{p,it,b,d};}).filter(Boolean)
+    .filter(x=>x.d!==null).sort((a,b)=>a.d-b.d);
+}
+
+/* ============================================================ 渲染路由 ============================================================ */
+function render(){
+  const v=$('#view');v.innerHTML='';
+  if(SEARCH){v.appendChild(renderSearch());return;}
+  ({dash:renderDash,products:renderProducts,expiry:renderExpiry,price:renderPrice,
+    usage:renderUsage,shopping:renderShopping,stats:renderStats}[CURRENT])(v);
+}
+
+/* ---------- 首頁 ---------- */
+function renderDash(v){
+  const totalProducts=DB.products.length;
+  const totalStock=DB.products.reduce((s,p)=>s+stockOf(p.id),0);
+  const soon=expiringSoon(30),expd=expiredList(),low=lowStockProducts();
+  const cards=[
+    {k:'商品種類',v:totalProducts,sub:'種',go:'products'},
+    {k:'總庫存',v:totalStock,sub:'件未使用',go:'products'},
+    {k:'即將到期',v:soon.length,sub:'30天內',go:'expiry',tone:soon.length?'y':''},
+    {k:'已過期',v:expd.length,sub:'批次',go:'expiry',tone:expd.length?'r':''},
+    {k:'庫存不足',v:low.length,sub:`剩≤${DB.settings.lowStock}`,go:'shopping',tone:low.length?'y':''},
+    {k:'待補貨',v:shoppingList().length,sub:'項',go:'shopping'},
+  ];
+  const g=el('div','grid cards');
+  cards.forEach(c=>{const card=el('div','card stat click');
+    card.innerHTML=`<span class="k">${c.k}</span><span class="v" style="color:${c.tone==='r'?'var(--danger)':c.tone==='y'?'var(--warn)':'inherit'}">${c.v}</span><span class="sub">${c.sub}</span>`;
+    card.onclick=()=>go(c.go);g.appendChild(card);});
+  v.appendChild(g);
+
+  // quick actions
+  const qa=el('div','sect');
+  qa.innerHTML='<h2>快捷操作</h2>';
+  const qrow=el('div');qrow.style.display='flex';qrow.style.gap='10px';qrow.style.flexWrap='wrap';
+  [['＋ 新增商品',()=>openProductModal()],['＋ 新增購買紀錄',()=>openBatchPicker()],
+   ['⏰ 查看即將到期',()=>go('expiry')],['📈 價格歷史',()=>go('price')]].forEach(([t,fn])=>{
+    const b=el('button','btn',t);b.onclick=fn;qrow.appendChild(b);});
+  qa.appendChild(qrow);v.appendChild(qa);
+
+  const two=el('div','sect two');
+  // 今日建議先用 (FEFO)
+  const c1=el('div','card');
+  c1.innerHTML='<h2 style="font-size:15px;margin:0 0 6px">🔆 今日建議先使用 (FEFO)</h2>';
+  const nu=nextToUse().slice(0,6);
+  const r1=el('div','rows');
+  if(!nu.length)r1.innerHTML='<div class="empty">沒有設定到期日的庫存</div>';
+  nu.forEach(x=>{const tone=expiryTone(x.d);
+    const row=el('div','row');
+    row.innerHTML=`<div class="grow"><div class="t">${emoji(x.p.category)} ${esc(x.p.name)}</div>
+      <div class="s">${x.b.expiryDate} 到期 · 剩 ${unusedCount(x.p.id)} 件</div></div>
+      <span class="pill ${tone}">${x.d<0?'已過期':'剩 '+x.d+' 天'}</span>`;
+    const btn=el('button','btn sm','使用一件');btn.onclick=()=>{doUse(x.p.id);};
+    row.appendChild(btn);r1.appendChild(row);});
+  c1.appendChild(r1);two.appendChild(c1);
+
+  // 最近使用
+  const c2=el('div','card');
+  c2.innerHTML='<h2 style="font-size:15px;margin:0 0 6px">📝 最近使用</h2>';
+  const r2=el('div','rows');const used=usedItemsSorted().slice(0,7);
+  if(!used.length)r2.innerHTML='<div class="empty">尚無使用紀錄</div>';
+  used.forEach(it=>{const p=productOf(it.productId),b=batchOf(it);
+    const row=el('div','row');
+    row.innerHTML=`<div class="grow"><div class="t">${emoji(p&&p.category)} ${esc(p?p.name:'—')}</div>
+      <div class="s">${it.usedDate} · ${b?esc(b.store||'—'):''} 批次 第${it.serial}件</div></div>
+      <span class="tag">已使用</span>`;r2.appendChild(row);});
+  c2.appendChild(r2);two.appendChild(c2);
+  v.appendChild(two);
+
+  // 最近新增 & 最近價格
+  const two2=el('div','sect two');
+  const c3=el('div','card');c3.innerHTML='<h2 style="font-size:15px;margin:0 0 6px">🆕 最近新增商品</h2>';
+  const r3=el('div','rows');
+  const recent=DB.products.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
+  if(!recent.length)r3.innerHTML='<div class="empty">還沒有商品，點右上角新增</div>';
+  recent.forEach(p=>{const row=el('div','row');
+    row.innerHTML=`<div class="grow"><div class="t">${emoji(p.category)} ${esc(p.name)}</div>
+      <div class="s">${esc(p.brand||'無品牌')} · ${esc(p.category||'未分類')}</div></div>
+      <span class="tag">庫存 ${stockOf(p.id)}</span>`;
+    row.onclick=()=>openDetail(p.id);row.style.cursor='pointer';r3.appendChild(row);});
+  c3.appendChild(r3);two2.appendChild(c3);
+
+  const c4=el('div','card');c4.innerHTML='<h2 style="font-size:15px;margin:0 0 6px">💲 最近購買 / 價格</h2>';
+  const r4=el('div','rows');
+  const rb=DB.batches.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
+  if(!rb.length)r4.innerHTML='<div class="empty">尚無購買紀錄</div>';
+  rb.forEach(b=>{const p=productOf(b.productId);const flag=priceFlag(b.productId,b.unitPrice,b.id);
+    const row=el('div','row');
+    row.innerHTML=`<div class="grow"><div class="t">${esc(p?p.name:'—')}</div>
+      <div class="s">${b.purchaseDate} · ${esc(b.store||'—')} · ${b.quantity}件</div></div>
+      <div style="text-align:right"><div class="t">${money(b.unitPrice)}</div>${flag?`<div class="s" style="color:${flag.color}">${flag.text}</div>`:''}</div>`;
+    r4.appendChild(row);});
+  c4.appendChild(r4);two2.appendChild(c4);
+  v.appendChild(two2);
+}
+
+/* ---------- 商品管理 ---------- */
+let PFILTER={cat:'',status:'',store:'',brand:''};
+function renderProducts(v){
+  // filter bar
+  const bar=el('div','filters');
+  const cats=[...new Set(DB.products.map(p=>p.category).filter(Boolean))];
+  const brands=[...new Set(DB.products.map(p=>p.brand).filter(Boolean))];
+  const stores=[...new Set(DB.batches.map(b=>b.store).filter(Boolean))];
+  bar.appendChild(selectFilter('分類',cats,PFILTER.cat,v2=>{PFILTER.cat=v2;render();}));
+  bar.appendChild(selectFilter('品牌',brands,PFILTER.brand,v2=>{PFILTER.brand=v2;render();}));
+  bar.appendChild(selectFilter('商店',stores,PFILTER.store,v2=>{PFILTER.store=v2;render();}));
+  const st=el('select');st.innerHTML=`<option value="">全部狀態</option>
+    <option value="soon">即將到期</option><option value="expired">已過期</option>
+    <option value="low">剩≤${DB.settings.lowStock}</option><option value="out">已用完</option>`;
+  st.value=PFILTER.status;st.onchange=e=>{PFILTER.status=e.target.value;render();};bar.appendChild(st);
+  const clr=el('button','chipbtn','清除篩選');clr.onclick=()=>{PFILTER={cat:'',status:'',store:'',brand:''};render();};bar.appendChild(clr);
+  v.appendChild(bar);
+
+  let list=DB.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant'));
+  if(PFILTER.cat)list=list.filter(p=>p.category===PFILTER.cat);
+  if(PFILTER.brand)list=list.filter(p=>p.brand===PFILTER.brand);
+  if(PFILTER.store)list=list.filter(p=>batchesOfProduct(p.id).some(b=>b.store===PFILTER.store));
+  if(PFILTER.status){
+    list=list.filter(p=>{
+      const stk=stockOf(p.id);
+      if(PFILTER.status==='out')return stk===0;
+      if(PFILTER.status==='low')return stk>0&&stk<=DB.settings.lowStock;
+      const bs=batchesOfProduct(p.id).filter(b=>DB.items.some(i=>i.batchId===b.id&&i.status==='unused'));
+      if(PFILTER.status==='soon')return bs.some(b=>{const d=daysLeft(b.expiryDate);return d!==null&&d>=0&&d<=30;});
+      if(PFILTER.status==='expired')return bs.some(b=>{const d=daysLeft(b.expiryDate);return d!==null&&d<0;});
+    });
+  }
+  if(!list.length){v.appendChild(el('div','empty','沒有符合條件的商品。點右上角「＋ 新增商品」開始。'));return;}
+  const g=el('div','pgrid');
+  list.forEach(p=>g.appendChild(productCard(p)));
+  v.appendChild(g);
+}
+function selectFilter(label,opts,val,cb){
+  const s=el('select');s.innerHTML=`<option value="">全部${label}</option>`+
+    opts.map(o=>`<option value="${esc(o)}"${o===val?' selected':''}>${esc(o)}</option>`).join('');
+  s.onchange=e=>cb(e.target.value);return s;
+}
+function productCard(p){
+  const c=el('div','pcard');
+  const stk=stockOf(p.id);
+  const bs=batchesOfProduct(p.id).filter(b=>DB.items.some(i=>i.batchId===b.id&&i.status==='unused'));
+  let expPill='';
+  const soonest=bs.map(b=>daysLeft(b.expiryDate)).filter(d=>d!==null).sort((a,b)=>a-b)[0];
+  if(soonest!==undefined){const t=expiryTone(soonest);
+    expPill=`<span class="pill ${t}">${soonest<0?'已過期':'剩'+soonest+'天'}</span>`;}
+  const stockPill=stk===0?`<span class="pill gray">已用完</span>`:
+    stk<=DB.settings.lowStock?`<span class="pill y">剩 ${stk}</span>`:`<span class="pill b">庫存 ${stk}</span>`;
+  const thumb=p.photo?`<img src="${p.photo}">`:emoji(p.category);
+  c.innerHTML=`<div class="ph"><div class="thumb">${thumb}</div>
+    <div style="min-width:0"><h3>${esc(p.name)}</h3>
+    <div class="meta">${esc(p.brand||'無品牌')}${p.category?' · '+esc(p.category):''}</div></div></div>
+    <div class="st">${stockPill}${expPill}</div>`;
+  c.onclick=()=>openDetail(p.id);
+  return c;
+}
+
+/* ---------- 到期管理 ---------- */
+function renderExpiry(v){
+  const expd=expiredList();
+  const s1=expiringSoon(30),s3=expiringSoon(90).filter(x=>x.d>30),s6=expiringSoon(180).filter(x=>x.d>90);
+  const section=(title,arr,tone)=>{
+    const c=el('div','card');c.style.marginBottom='14px';
+    c.innerHTML=`<h2 style="font-size:15px;margin:0 0 8px">${title} <span class="muted" style="font-weight:400">(${arr.length})</span></h2>`;
+    const rows=el('div','rows');
+    if(!arr.length)rows.innerHTML='<div class="empty">無</div>';
+    arr.forEach(x=>{const p=productOf(x.b.productId);const row=el('div','row');
+      row.innerHTML=`<div class="grow"><div class="t">${emoji(p&&p.category)} ${esc(p?p.name:'—')}</div>
+        <div class="s">${esc(x.b.store||'—')} 批次 · 到期 ${x.b.expiryDate} · 剩 ${x.left} 件</div></div>
+        <span class="pill ${tone}">${x.d<0?'過期 '+(-x.d)+' 天':'剩 '+x.d+' 天'}</span>`;
+      const btn=el('button','btn sm','使用一件');btn.onclick=()=>{doUse(x.b.productId);};
+      row.appendChild(btn);
+      row.onclick=e=>{if(e.target.tagName!=='BUTTON')openDetail(x.b.productId);};
+      rows.appendChild(row);});
+    c.appendChild(rows);return c;
+  };
+  if(expd.length)v.appendChild(section('🟥 已過期',expd,'r'));
+  v.appendChild(section('🟥 1 個月內到期',s1,'r'));
+  v.appendChild(section('🟨 3 個月內',s3,'y'));
+  v.appendChild(section('🟩 6 個月內',s6,'g'));
+}
+
+/* ---------- 價格分析 ---------- */
+function renderPrice(v){
+  const withPrice=DB.products.filter(p=>priceHistory(p.id).length);
+  if(!withPrice.length){v.appendChild(el('div','empty','還沒有含價格的購買紀錄。到商品詳細頁「新增購買批次」並填單價。'));return;}
+  const g=el('div','grid');g.style.gridTemplateColumns='1fr';
+  withPrice.sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant')).forEach(p=>{
+    const hist=priceHistory(p.id);
+    const prices=hist.map(h=>h.price);
+    const min=Math.min(...prices),max=Math.max(...prices),avg=prices.reduce((a,b)=>a+b,0)/prices.length;
+    const last=hist[hist.length-1];
+    const card=el('div','card');
+    const flag=priceFlagValue(last.price,min,avg);
+    card.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <h2 style="font-size:16px;margin:0">${emoji(p.category)} ${esc(p.name)}</h2>
+      <span class="tag">${esc(p.brand||'')}</span>
+      <span style="margin-left:auto;font-size:13px;color:${flag.color};font-weight:700">${flag.text}</span></div>`;
+    const cw=el('div','chartwrap');cw.innerHTML=lineChart(hist);card.appendChild(cw);
+    const ps=el('div','pstats');
+    ps.innerHTML=`<div><span class="muted">歷史最低</span><b style="color:var(--ok)">${money(min)}</b></div>
+      <div><span class="muted">歷史平均</span><b>${money(avg)}</b></div>
+      <div><span class="muted">歷史最高</span><b style="color:var(--danger)">${money(max)}</b></div>
+      <div><span class="muted">最近購買</span><b>${money(last.price)}</b><span class="muted" style="font-size:11px">${last.date} ${esc(last.store||'')}</span></div>`;
+    card.appendChild(ps);
+    card.style.cursor='pointer';card.onclick=()=>openDetail(p.id);
+    g.appendChild(card);
+  });
+  v.appendChild(g);
+}
+function priceFlagValue(cur,min,avg){
+  if(cur<=min)return{text:'🟢 歷史最低價',color:'var(--ok)'};
+  const diff=(cur-avg)/avg*100;
+  if(diff>10)return{text:`🔴 高於平均 ${Math.round(diff)}%`,color:'var(--danger)'};
+  if(diff<-3)return{text:`🟢 低於平均 ${Math.round(-diff)}%`,color:'var(--ok)'};
+  return{text:'🟡 接近平均價',color:'var(--warn)'};
+}
+function priceFlag(productId,price,excludeBatchId){
+  const hist=priceHistory(productId).filter((h,i)=>true);
+  const others=batchesOfProduct(productId).filter(b=>b.id!==excludeBatchId&&b.unitPrice>0).map(b=>b.unitPrice);
+  if(!others.length)return null;
+  const min=Math.min(...others),avg=others.reduce((a,b)=>a+b,0)/others.length;
+  const f=priceFlagValue(price,min,avg);return{text:f.text,color:f.color};
+}
+/* 簡易 SVG 折線圖 */
+function lineChart(hist){
+  const W=680,H=180,pad=34;
+  const prices=hist.map(h=>h.price);
+  const min=Math.min(...prices),max=Math.max(...prices);
+  const range=(max-min)||1;
+  const n=hist.length;
+  const x=i=>pad+(n===1?(W-2*pad)/2:(i*(W-2*pad)/(n-1)));
+  const y=p=>H-pad-((p-min)/range)*(H-2*pad);
+  let pts=hist.map((h,i)=>`${x(i)},${y(h.price)}`).join(' ');
+  let dots=hist.map((h,i)=>`<circle cx="${x(i)}" cy="${y(h.price)}" r="4" fill="var(--brand)"></circle>
+    <text x="${x(i)}" y="${y(h.price)-9}" font-size="11" text-anchor="middle" fill="var(--ink)">${money(h.price)}</text>
+    <text x="${x(i)}" y="${H-pad+16}" font-size="10" text-anchor="middle" fill="var(--muted)">${h.date.slice(2)}</text>`).join('');
+  const avg=prices.reduce((a,b)=>a+b,0)/n;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible">
+    <line x1="${pad}" y1="${y(avg)}" x2="${W-pad}" y2="${y(avg)}" stroke="var(--line)" stroke-dasharray="4 4"></line>
+    <text x="${W-pad}" y="${y(avg)-4}" font-size="10" text-anchor="end" fill="var(--muted)">平均 ${money(avg)}</text>
+    <polyline points="${pts}" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round"></polyline>
+    ${dots}</svg>`;
+}
+
+/* ---------- 使用紀錄 ---------- */
+function renderUsage(v){
+  const used=usedItemsSorted();
+  if(!used.length){v.appendChild(el('div','empty','尚無使用紀錄。'));return;}
+  const card=el('div','card');
+  const t=el('table');
+  t.innerHTML=`<thead><tr><th>使用日期</th><th>商品</th><th>批次/商店</th><th>件號</th><th class="num"></th></tr></thead>`;
+  const tb=el('tbody');
+  used.forEach(it=>{const p=productOf(it.productId),b=batchOf(it);
+    const tr=el('tr');
+    tr.innerHTML=`<td>${it.usedDate}</td><td>${emoji(p&&p.category)} ${esc(p?p.name:'—')}</td>
+      <td class="muted">${b?esc(b.store||'—'):'—'}${b&&b.expiryDate?' · 期'+b.expiryDate:''}</td>
+      <td>第 ${it.serial} 件</td>
+      <td class="num"><button class="btn sm">復原</button></td>`;
+    tr.querySelector('button').onclick=()=>{undoUse(it.id);toast('已復原為未使用');refresh();};
+    tb.appendChild(tr);});
+  t.appendChild(tb);card.appendChild(t);v.appendChild(card);
+}
+
+/* ---------- 購物清單 ---------- */
+function renderShopping(v){
+  const list=shoppingList();
+  const c=el('div','card');
+  c.innerHTML=`<h2 style="font-size:15px;margin:0 0 4px">🛒 待補貨清單</h2>
+    <div class="hint" style="margin-bottom:8px">庫存 ≤ ${DB.settings.lowStock} 的商品會自動列入。到超市時打開這頁即可。</div>`;
+  const rows=el('div','rows');
+  if(!list.length)rows.innerHTML='<div class="empty">目前庫存充足，沒有需要補貨的商品 🎉</div>';
+  list.sort((a,b)=>stockOf(a.id)-stockOf(b.id)).forEach(p=>{
+    const stk=stockOf(p.id);
+    const hist=priceHistory(p.id);
+    let priceHint='';
+    if(hist.length){const min=Math.min(...hist.map(h=>h.price));priceHint=`歷史最低 ${money(min)}`;}
+    const row=el('div','row');
+    row.innerHTML=`<input type="checkbox" style="width:18px;height:18px">
+      <div class="grow"><div class="t">${emoji(p.category)} ${esc(p.name)} <span class="muted" style="font-weight:400">${esc(p.brand||'')}</span></div>
+      <div class="s">${stk===0?'已用完':'剩 '+stk+' 件'}${priceHint?' · '+priceHint:''}</div></div>`;
+    const btn=el('button','btn sm primary','＋ 記錄購買');
+    btn.onclick=()=>openBatchModal(p.id);row.appendChild(btn);
+    const cb=row.querySelector('input');
+    cb.onchange=()=>{row.style.opacity=cb.checked?.5:1;};
+    rows.appendChild(row);});
+  c.appendChild(rows);v.appendChild(c);
+}
+
+/* ---------- 統計分析 ---------- */
+function renderStats(v){
+  const now=new Date(),ym=now.toISOString().slice(0,7),year=String(now.getFullYear());
+  const addedThisMonth=DB.products.filter(p=>new Date(p.createdAt).toISOString().slice(0,7)===ym).length;
+  const usedThisMonth=DB.items.filter(i=>i.status==='used'&&(i.usedDate||'').slice(0,7)===ym).length;
+  const spentThisYear=DB.batches.filter(b=>(b.purchaseDate||'').slice(0,4)===year)
+    .reduce((s,b)=>s+b.unitPrice*b.quantity,0);
+  const totalStock=DB.products.reduce((s,p)=>s+stockOf(p.id),0);
+  const g=el('div','grid cards');
+  [['本月新增商品',addedThisMonth,'種'],['本月使用',usedThisMonth,'件'],
+   ['目前總庫存',totalStock,'件'],[`${year} 年花費`,money(spentThisYear),'']].forEach(([k,val,sub])=>{
+    const c=el('div','card stat');c.innerHTML=`<span class="k">${k}</span><span class="v">${val}</span><span class="sub">${sub}</span>`;g.appendChild(c);});
+  v.appendChild(g);
+
+  const two=el('div','sect two');
+  // 花費排行 (依分類)
+  const byCat={};
+  DB.batches.forEach(b=>{const p=productOf(b.productId);const cat=(p&&p.category)||'未分類';
+    byCat[cat]=(byCat[cat]||0)+b.unitPrice*b.quantity;});
+  two.appendChild(rankCard('💰 花費排行（分類）',Object.entries(byCat).sort((a,b)=>b[1]-a[1]),v=>money(v)));
+  // 消耗最快 (使用件數)
+  const byUse={};
+  DB.items.filter(i=>i.status==='used').forEach(i=>{const p=productOf(i.productId);const n=(p&&p.name)||'—';
+    byUse[n]=(byUse[n]||0)+1;});
+  two.appendChild(rankCard('🔥 消耗最快（使用件數）',Object.entries(byUse).sort((a,b)=>b[1]-a[1]),v=>v+' 件'));
+  v.appendChild(two);
+
+  // 最常購買商店
+  const byStore={};
+  DB.batches.forEach(b=>{if(b.store){byStore[b.store]=(byStore[b.store]||0)+1;}});
+  const sc=el('div','sect');
+  sc.appendChild(rankCard('🏬 最常購買商店（批次數）',Object.entries(byStore).sort((a,b)=>b[1]-a[1]),v=>v+' 次'));
+  v.appendChild(sc);
+}
+function rankCard(title,entries,fmt){
+  const c=el('div','card');c.innerHTML=`<h2 style="font-size:15px;margin:0 0 8px">${title}</h2>`;
+  const rows=el('div','rows');
+  if(!entries.length)rows.innerHTML='<div class="empty">尚無資料</div>';
+  const maxV=entries.length?entries[0][1]:1;
+  entries.slice(0,8).forEach(([k,val],i)=>{
+    const row=el('div','row');
+    row.innerHTML=`<div style="width:22px;color:var(--muted);font-weight:700">${i+1}</div>
+      <div class="grow"><div class="t">${esc(k)}</div>
+      <div style="height:6px;background:var(--chip);border-radius:4px;margin-top:5px;overflow:hidden">
+        <div style="height:100%;width:${Math.max(6,val/maxV*100)}%;background:var(--brand)"></div></div></div>
+      <div style="font-weight:700">${fmt(val)}</div>`;
+    rows.appendChild(row);});
+  c.appendChild(rows);return c;
+}
+
+/* ---------- 搜尋結果 ---------- */
+function renderSearch(){
+  const q=SEARCH.toLowerCase();
+  const wrap=el('div');
+  wrap.appendChild(el('div','sub-h',`搜尋「${esc(SEARCH)}」`));
+  const matched=DB.products.filter(p=>{
+    const inStores=batchesOfProduct(p.id).some(b=>(b.store||'').toLowerCase().includes(q));
+    return[p.name,p.brand,p.category,p.barcode].some(x=>(x||'').toLowerCase().includes(q))||inStores;
+  });
+  if(!matched.length){wrap.appendChild(el('div','empty','找不到符合的商品。'));return wrap;}
+  const g=el('div','pgrid');matched.forEach(p=>g.appendChild(productCard(p)));wrap.appendChild(g);
+  return wrap;
+}
+function onSearch(){SEARCH=$('#globalSearch').value.trim();render();}
+
+/* ============================================================ 商品詳細頁 (modal) ============================================================ */
+function openDetail(id){
+  const p=productOf(id);if(!p)return;
+  const host=$('#modalHost');
+  const stk=stockOf(id),total=itemsOfProduct(id).length,used=total-stk;
+  const opened=DB.items.filter(i=>i.productId===id&&i.status==='unused'&&i.opened).length;
+  const hist=priceHistory(id);
+  const thumb=p.photo?`<img src="${p.photo}">`:emoji(p.category);
+  let priceBlock='';
+  if(hist.length){
+    const prices=hist.map(h=>h.price),min=Math.min(...prices),max=Math.max(...prices),avg=prices.reduce((a,b)=>a+b,0)/prices.length;
+    priceBlock=`<div class="sub-h">價格歷史</div>
+      <div class="chartwrap">${lineChart(hist)}</div>
+      <div class="pstats"><div><span class="muted">最低</span><b style="color:var(--ok)">${money(min)}</b></div>
+      <div><span class="muted">平均</span><b>${money(avg)}</b></div>
+      <div><span class="muted">最高</span><b style="color:var(--danger)">${money(max)}</b></div></div>`;
+  }
+  const usedList=DB.items.filter(i=>i.productId===id&&i.status==='used')
+    .sort((a,b)=>(b.usedDate||'').localeCompare(a.usedDate||''));
+
+  host.innerHTML=`<div class="modal wide"><div class="mh">
+    <h2>商品詳細</h2>
+    <button class="btn sm" onclick="openProductModal('${id}')">✎ 編輯</button>
+    <button class="btn sm danger" onclick="confirmDeleteProduct('${id}')">刪除</button>
+    <button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb">
+      <div class="dhead"><div class="thumb">${thumb}</div>
+        <div style="flex:1">
+          <h2 style="margin:0 0 2px;font-size:20px">${esc(p.name)}</h2>
+          <div class="muted">${esc(p.brand||'無品牌')}${p.category?' · '+esc(p.category):''}${p.barcode?' · 條碼 '+esc(p.barcode):''}</div>
+          ${p.note?`<div style="margin-top:6px;font-size:13px">${esc(p.note)}</div>`:''}
+          <div class="st" style="margin-top:10px;display:flex;gap:8px">
+            <span class="pill b">庫存 ${stk} 件未使用</span>
+            ${opened?`<span class="pill y">${opened} 件已開封</span>`:''}
+            <span class="pill gray">累計使用 ${used} 件</span></div>
+        </div>
+        <button class="btn primary" onclick="doUse('${id}')">使用一件 (FEFO)</button>
+      </div>
+
+      <div class="sub-h" style="display:flex;align-items:center">購買批次
+        <button class="btn sm" style="margin-left:auto" onclick="openBatchModal('${id}')">＋ 新增購買批次</button></div>
+      <div id="batchList"></div>
+
+      ${priceBlock}
+
+      <div class="sub-h">使用歷史 (${usedList.length})</div>
+      <div class="rows" style="max-height:180px;overflow:auto">
+        ${usedList.length?usedList.map(it=>{const b=batchOf(it);
+          return `<div class="row"><div class="grow"><div class="t">第 ${it.serial} 件 · ${b?esc(b.store||'—'):''}</div>
+          <div class="s">使用於 ${it.usedDate}${b&&b.expiryDate?' · 期 '+b.expiryDate:''}</div></div>
+          <button class="btn sm" onclick="undoUse('${it.id}');refresh();openDetail('${id}')">復原</button></div>`;}).join(''):'<div class="empty">尚無使用紀錄</div>'}
+      </div>
+    </div></div>`;
+  renderBatchList(id);
+  $('#overlay').classList.add('open');
+}
+function renderBatchList(id){
+  const host=$('#batchList');if(!host)return;host.innerHTML='';
+  const bs=batchesOfProduct(id);
+  if(!bs.length){host.innerHTML='<div class="empty">還沒有購買批次，點右上「＋ 新增購買批次」</div>';return;}
+  // 找出 FEFO 下一件
+  const nextItem=(()=>{const c=DB.items.filter(i=>i.productId===id&&i.status==='unused');
+    if(!c.length)return null;c.sort((a,b)=>expRank(a)-expRank(b));return c[0].id;})();
+  bs.forEach(b=>{
+    const items=DB.items.filter(i=>i.batchId===b.id).sort((a,b)=>a.serial-b.serial);
+    const left=items.filter(i=>i.status==='unused').length;
+    const d=daysLeft(b.expiryDate),tone=expiryTone(d);
+    const div=el('div','batch');
+    div.innerHTML=`<div class="bt">
+      <b>${esc(b.store||'未填商店')}</b>
+      <span class="tag">${money(b.unitPrice)}／件</span>
+      ${b.expiryDate?`<span class="pill ${tone}">${d<0?'已過期':'剩 '+d+' 天'}</span>`:'<span class="tag">無到期日</span>'}
+      <span style="margin-left:auto" class="muted">剩 ${left}/${items.length}</span>
+      <button class="btn sm danger" title="刪除批次" onclick="confirmDeleteBatch('${b.id}','${id}')">🗑</button></div>
+      <div class="bmeta">購買 ${b.purchaseDate}${b.expiryDate?' · 到期 '+b.expiryDate:''} · 單價 ${money(b.unitPrice)} · 共 ${b.quantity} 件${b.note?' · '+esc(b.note):''}</div>`;
+    const dots=el('div','itemdots');
+    items.forEach(it=>{
+      const dot=el('div','dot'+(it.status==='used'?' used':'')+(it.id===nextItem?' next':''));
+      dot.textContent=it.serial;
+      dot.title=it.status==='used'?('已使用 '+it.usedDate):(it.opened?'已開封（點擊使用）':'未使用（點擊使用）');
+      if(it.status==='unused'){dot.style.cursor='pointer';dot.onclick=()=>{useItem(it.id);toast('已使用 第'+it.serial+'件');refresh();openDetail(it.productId);};}
+      else{dot.style.cursor='pointer';dot.onclick=()=>{undoUse(it.id);toast('已復原');refresh();openDetail(it.productId);};}
+      dots.appendChild(dot);
+    });
+    div.appendChild(dots);
+    host.appendChild(div);
+  });
+}
+
+/* ============================================================ 新增/編輯 商品 ============================================================ */
+function openProductModal(id){
+  const p=id?productOf(id):null;
+  const host=$('#modalHost');
+  const cats=['生活用品','清潔用品','美妝','保健食品','食品','嬰幼兒','寵物'];
+  host.innerHTML=`<div class="modal"><div class="mh"><h2>${p?'編輯商品':'新增商品'}</h2>
+    <button class="x" onclick="${p?`openDetail('${id}')`:'closeModal()'}">×</button></div>
+    <div class="mb">
+      <div class="field"><label>商品名稱 *</label><input id="f_name" value="${esc(p?p.name:'')}" placeholder="例：洗髮精"></div>
+      <div class="frow">
+        <div class="field"><label>品牌</label><input id="f_brand" value="${esc(p?p.brand:'')}" placeholder="例：多芬" list="brandList"></div>
+        <div class="field"><label>分類</label><input id="f_cat" value="${esc(p?p.category:'')}" placeholder="例：清潔用品" list="catList">
+          <datalist id="catList">${cats.map(c=>`<option value="${c}">`).join('')}</datalist></div>
+      </div>
+      <div class="field"><label>條碼</label><input id="f_barcode" value="${esc(p?p.barcode:'')}" placeholder="可留空"></div>
+      <div class="field"><label>商品照片</label><input type="file" id="f_photo" accept="image/*" onchange="previewPhoto(event)">
+        <div class="hint">選填，會縮小後存在本機。</div>
+        <div id="photoPrev" style="margin-top:8px">${p&&p.photo?`<img src="${p.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">`:''}</div></div>
+      <div class="field"><label>備註</label><textarea id="f_note" placeholder="例：只買無香款">${esc(p?p.note:'')}</textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="${p?`openDetail('${id}')`:'closeModal()'}">取消</button>
+      <button class="btn primary" onclick="saveProduct(${p?`'${id}'`:'null'})">${p?'儲存':'新增並可加購買批次'}</button></div></div>`;
+  $('#overlay').classList.add('open');
+  $('#f_name').focus();
+}
+let _photoData='';
+function previewPhoto(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();img.onload=()=>{
+      const max=320,scale=Math.min(1,max/Math.max(img.width,img.height));
+      const cv=document.createElement('canvas');cv.width=img.width*scale;cv.height=img.height*scale;
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      _photoData=cv.toDataURL('image/jpeg',0.8);
+      $('#photoPrev').innerHTML=`<img src="${_photoData}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">`;
+    };img.src=e.target.result;
+  };reader.readAsDataURL(file);
+}
+function saveProduct(id){
+  const name=$('#f_name').value.trim();
+  if(!name){toast('請輸入商品名稱');$('#f_name').focus();return;}
+  const data={name,brand:$('#f_brand').value,category:$('#f_cat').value,
+    barcode:$('#f_barcode').value,note:$('#f_note').value};
+  if(_photoData)data.photo=_photoData;
+  if(id){updateProduct(id,data);_photoData='';toast('已儲存');refresh();openDetail(id);}
+  else{const o=addProduct(data);_photoData='';toast('商品已新增');refresh();openBatchModal(o.id);}
+}
+
+/* ============================================================ 新增購買批次 ============================================================ */
+function openBatchModal(productId){
+  const p=productOf(productId);
+  const host=$('#modalHost');
+  const stores=[...new Set(DB.batches.map(b=>b.store).filter(Boolean))];
+  host.innerHTML=`<div class="modal"><div class="mh"><h2>新增購買批次 · ${esc(p.name)}</h2>
+    <button class="x" onclick="openDetail('${productId}')">×</button></div>
+    <div class="mb">
+      <div class="frow">
+        <div class="field"><label>購買日期 *</label><input type="date" id="b_date" value="${todayISO()}"></div>
+        <div class="field"><label>商店 / 通路</label><input id="b_store" placeholder="例：Costco" list="storeList">
+          <datalist id="storeList">${stores.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+      </div>
+      <div class="frow3">
+        <div class="field"><label>數量 *</label><input type="number" id="b_qty" min="1" value="1" oninput="calcPreview('${productId}')"></div>
+        <div class="field"><label>單價</label><input type="number" id="b_price" min="0" step="1" placeholder="0" oninput="calcPreview('${productId}')"></div>
+        <div class="field"><label>有效期限</label><input type="month" id="b_exp"></div>
+      </div>
+      <div class="hint">有效期限可只填到「月」；系統會以該月 1 日計算到期。同商品多批次時，使用時自動先扣最早到期。</div>
+      <div id="pricePreview" class="priceflag"></div>
+      <div class="field" style="margin-top:12px"><label>備註 / 發票</label><textarea id="b_note" placeholder="例：發票號碼、促銷活動"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="openDetail('${productId}')">取消</button>
+      <button class="btn primary" onclick="saveBatch('${productId}')">新增批次（建立 <span id="qtyLabel">1</span> 件庫存）</button></div></div>`;
+  $('#overlay').classList.add('open');
+  calcPreview(productId);
+  $('#b_store').focus();
+}
+function calcPreview(productId){
+  const qty=parseInt($('#b_qty').value)||0;
+  const ql=$('#qtyLabel');if(ql)ql.textContent=qty;
+  const price=parseFloat($('#b_price').value);
+  const pv=$('#pricePreview');
+  if(price>0){
+    const f=priceFlag(productId,price,null);
+    const total=price*qty;
+    pv.innerHTML=`小計 ${money(total)}`+(f?` &nbsp;·&nbsp; <span style="color:${f.color}">${f.text}</span>`:' &nbsp;·&nbsp; <span class="muted">首次購買，尚無比價基準</span>');
+  }else pv.innerHTML='';
+}
+function saveBatch(productId){
+  const qty=parseInt($('#b_qty').value)||0;
+  if(qty<1){toast('數量至少 1');return;}
+  let exp=$('#b_exp').value;if(exp&&exp.length===7)exp=exp+'-01';
+  addBatch({productId,purchaseDate:$('#b_date').value,store:$('#b_store').value,
+    unitPrice:$('#b_price').value,quantity:qty,expiryDate:exp,note:$('#b_note').value});
+  toast(`已新增批次，建立 ${qty} 件庫存`);
+  refresh();openDetail(productId);
+}
+/* 從別處新增購買：先選商品 */
+function openBatchPicker(){
+  if(!DB.products.length){toast('請先新增商品');openProductModal();return;}
+  const host=$('#modalHost');
+  host.innerHTML=`<div class="modal"><div class="mh"><h2>選擇商品以新增購買紀錄</h2>
+    <button class="x" onclick="closeModal()">×</button></div>
+    <div class="mb"><div class="rows">
+    ${DB.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant')).map(p=>
+      `<div class="row" style="cursor:pointer" onclick="openBatchModal('${p.id}')">
+        <div class="grow"><div class="t">${emoji(p.category)} ${esc(p.name)}</div>
+        <div class="s">${esc(p.brand||'')} · 庫存 ${stockOf(p.id)}</div></div><span class="btn sm">選擇</span></div>`).join('')}
+    </div></div></div>`;
+  $('#overlay').classList.add('open');
+}
+
+/* ============================================================ 使用 / 刪除 動作 ============================================================ */
+function doUse(productId){
+  const it=useOne(productId);
+  if(!it){toast('沒有可使用的庫存');return;}
+  const p=productOf(productId),b=batchOf(it);
+  toast(`已使用 ${p.name}（${b&&b.expiryDate?b.expiryDate+' 到期批次':''} 第${it.serial}件）`);
+  refresh();
+  if($('#overlay').classList.contains('open'))openDetail(productId);
+}
+function confirmDeleteProduct(id){
+  const p=productOf(id);
+  if(confirm(`確定刪除「${p.name}」？\n所有購買批次與使用紀錄都會一併刪除，無法復原。`)){
+    deleteProduct(id);closeModal();toast('已刪除商品');refresh();}
+}
+function confirmDeleteBatch(bid,pid){
+  if(confirm('確定刪除此批次？此批次下的所有單件庫存（含使用紀錄）都會刪除。')){
+    deleteBatch(bid);toast('已刪除批次');refresh();openDetail(pid);}
+}
+
+/* ============================================================ 匯入 / 匯出 / 範例 ============================================================ */
+function exportData(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='家庭庫存備份_'+todayISO()+'.json';a.click();
+  toast('已匯出備份');
+}
+function importData(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{try{const data=JSON.parse(e.target.result);
+    if(!data.products)throw'格式錯誤';
+    if(!confirm('匯入將覆蓋目前所有資料，確定？'))return;
+    DB.products=data.products||[];DB.batches=data.batches||[];DB.items=data.items||[];
+    DB.settings=Object.assign({expiryAlerts:[90,30,7],lowStock:1},data.settings||{});
+    save();toast('匯入完成');refresh();
+  }catch(err){alert('匯入失敗：'+err);}};
+  r.readAsText(file);ev.target.value='';
+}
+function loadDemo(){
+  if(DB.products.length&&!confirm('載入範例會覆蓋目前資料，確定？'))return;
+  DB.products=[];DB.batches=[];DB.items=[];
+  const mk=(name,brand,cat,note)=>addProduct({name,brand,category:cat,note});
+  const shampoo=mk('洗髮精','多芬','清潔用品','無矽靈');
+  const wash=mk('洗衣精','白蘭','清潔用品','');
+  const paper=mk('衛生紙','五月花','生活用品','');
+  const vitc=mk('維他命C','DHC','保健食品','每天一顆');
+  const mask=mk('面膜','森田','美妝','');
+  const paste=mk('牙膏','高露潔','生活用品','');
+  const daysFrom=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+  const monthsFrom=n=>{const d=new Date();d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);};
+  const back=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+  // 洗髮精：兩批不同價，看價格圖
+  addBatch({productId:shampoo.id,purchaseDate:back(400),store:'Costco',unitPrice:239,quantity:3,expiryDate:monthsFrom(14)});
+  addBatch({productId:shampoo.id,purchaseDate:back(120),store:'家樂福',unitPrice:199,quantity:2,expiryDate:monthsFrom(20)});
+  // 洗衣精：多次價格
+  addBatch({productId:wash.id,purchaseDate:back(600),store:'Costco',unitPrice:299,quantity:1,expiryDate:monthsFrom(24)});
+  addBatch({productId:wash.id,purchaseDate:back(400),store:'家樂福',unitPrice:259,quantity:1,expiryDate:monthsFrom(26)});
+  addBatch({productId:wash.id,purchaseDate:back(200),store:'全聯',unitPrice:249,quantity:1,expiryDate:monthsFrom(28)});
+  addBatch({productId:wash.id,purchaseDate:back(20),store:'Costco',unitPrice:319,quantity:1,expiryDate:monthsFrom(30)});
+  // 衛生紙 剩一串
+  addBatch({productId:paper.id,purchaseDate:back(30),store:'全聯',unitPrice:189,quantity:1,expiryDate:''});
+  // 維他命C 快到期
+  addBatch({productId:vitc.id,purchaseDate:back(300),store:'康是美',unitPrice:350,quantity:2,expiryDate:daysFrom(6)});
+  // 面膜 20天到期
+  addBatch({productId:mask.id,purchaseDate:back(60),store:'屈臣氏',unitPrice:99,quantity:5,expiryDate:daysFrom(20)});
+  // 牙膏 兩批 FEFO 示範
+  addBatch({productId:paste.id,purchaseDate:back(200),store:'全聯',unitPrice:65,quantity:2,expiryDate:daysFrom(240)});
+  addBatch({productId:paste.id,purchaseDate:back(10),store:'Costco',unitPrice:59,quantity:5,expiryDate:daysFrom(600)});
+  // 用掉幾件建立使用紀錄
+  useOne(wash.id);useOne(shampoo.id);useOne(mask.id);
+  save();toast('已載入範例資料');go('dash');
+}
+
+/* ============================================================ 共用 ============================================================ */
+function closeModal(){$('#overlay').classList.remove('open');$('#modalHost').innerHTML='';_photoData='';}
+function refresh(){renderNav();render();}
+$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+/* init */
+load();renderNav();render();
+</script>
+</body>
+</html>
