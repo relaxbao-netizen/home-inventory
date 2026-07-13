@@ -195,8 +195,13 @@ function addProduct(p){const o={id:uid(),name:p.name.trim(),brand:(p.brand||'').
   category:(p.category||'').trim(),barcode:(p.barcode||'').trim(),note:(p.note||'').trim(),
   photo:p.photo||'',createdAt:Date.now()};DB.products.push(o);save();return o;}
 function updateProduct(id,p){const o=DB.products.find(x=>x.id===id);if(!o)return;
-  Object.assign(o,{name:p.name.trim(),brand:(p.brand||'').trim(),category:(p.category||'').trim(),
-  barcode:(p.barcode||'').trim(),note:(p.note||'').trim(),photo:p.photo??o.photo});save();}
+  if(p.name!=null)o.name=p.name.trim();
+  if(p.brand!=null)o.brand=p.brand.trim();
+  if(p.category!=null)o.category=p.category.trim();
+  if(p.barcode!=null)o.barcode=p.barcode.trim();
+  if(p.note!=null)o.note=p.note.trim();
+  if(p.photo!=null)o.photo=p.photo;
+  save();}
 function deleteProduct(id){DB.items=DB.items.filter(i=>i.productId!==id);
   DB.batches=DB.batches.filter(b=>b.productId!==id);
   DB.products=DB.products.filter(p=>p.id!==id);save();}
@@ -760,17 +765,17 @@ function openProductModal(id){
     <button class="x" onclick="${p?`openDetail('${id}')`:'closeModal()'}">×</button></div>
     <div class="mb">
       <div class="field"><label>商品名稱 *</label><input id="f_name" value="${esc(p?p.name:'')}" placeholder="例：洗髮精"></div>
-      <div class="frow">
-        <div class="field"><label>品牌</label><input id="f_brand" value="${esc(p?p.brand:'')}" placeholder="例：多芬" list="brandList"></div>
-        <div class="field"><label>分類</label><input id="f_cat" value="${esc(p?p.category:'')}" placeholder="例：清潔用品" list="catList">
-          <datalist id="catList">${cats.map(c=>`<option value="${c}">`).join('')}</datalist></div>
+      ${p?'':`<div class="frow">
+        <div class="field"><label>有效日期</label><input type="date" id="f_exp"></div>
+        <div class="field"><label>數量</label><input type="number" id="f_qty" min="0" value="1"></div>
       </div>
-      <div class="field"><label>條碼</label>
-        <div style="display:flex;gap:8px">
-          <input id="f_barcode" value="${esc(p?p.barcode:'')}" placeholder="可留空，或按右邊掃描" style="flex:1">
-          <button type="button" class="btn" onclick="openScanner('f_barcode')" style="white-space:nowrap">📷 掃描</button>
-        </div>
-        <div class="hint">用手機相機掃商品條碼自動帶入。</div></div>
+      <div class="hint">填數量會直接建立庫存；到期日可留空。單價、商店可之後在商品頁「新增購買批次」補上。</div>`}
+      <div class="field"><label>分類</label>
+        <select id="f_cat">
+          <option value="">未分類</option>
+          ${cats.map(c=>`<option value="${c}"${p&&p.category===c?' selected':''}>${c}</option>`).join('')}
+          ${p&&p.category&&!cats.includes(p.category)?`<option value="${esc(p.category)}" selected>${esc(p.category)}</option>`:''}
+        </select></div>
       <div class="field"><label>備註</label><textarea id="f_note" placeholder="例：只買無香款">${esc(p?p.note:'')}</textarea></div>
     </div>
     <div class="mf"><button class="btn" onclick="${p?`openDetail('${id}')`:'closeModal()'}">取消</button>
@@ -781,10 +786,18 @@ function openProductModal(id){
 function saveProduct(id){
   const name=$('#f_name').value.trim();
   if(!name){toast('請輸入商品名稱');$('#f_name').focus();return;}
-  const data={name,brand:$('#f_brand').value,category:$('#f_cat').value,
-    barcode:$('#f_barcode').value,note:$('#f_note').value};
-  if(id){updateProduct(id,data);toast('已儲存');refresh();openDetail(id);}
-  else{const o=addProduct(data);toast('商品已新增');refresh();openBatchModal(o.id);}
+  if(id){
+    updateProduct(id,{name,category:$('#f_cat').value,note:$('#f_note').value});
+    toast('已儲存');refresh();openDetail(id);return;
+  }
+  const o=addProduct({name,category:$('#f_cat').value,note:$('#f_note').value});
+  const qty=parseInt($('#f_qty').value)||0;
+  let exp=$('#f_exp').value||'';if(exp&&exp.length===7)exp=exp+'-01';
+  if(qty>0){
+    addBatch({productId:o.id,purchaseDate:todayISO(),store:'',unitPrice:0,quantity:qty,expiryDate:exp,note:''});
+    toast('已新增，建立 '+qty+' 件庫存');
+  }else toast('商品已新增');
+  refresh();openDetail(o.id);
 }
 
 /* ============================================================ 條碼掃描 (相機) ============================================================ */
