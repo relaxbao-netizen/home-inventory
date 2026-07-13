@@ -1006,6 +1006,11 @@ document.addEventListener('click',e=>{
 
 /* init */
 load();renderNav();render();
+
+/* Service Worker：有網路抓最新、沒網路可離線使用 */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
 </script>
 </body>
 </html>
